@@ -42,20 +42,29 @@ function loadCommands(dir) {
   }
 }
 
-loadCommands(path.join(__dirname, "commands"));
+const commandsDir = path.join(__dirname, "commands");
+if (fs.existsSync(commandsDir)) {
+  loadCommands(commandsDir);
+} else {
+  console.warn("[cmd] Commands directory not found, skipping command loading.");
+}
 
 const eventsDir = path.join(__dirname, "events");
-for (const file of fs.readdirSync(eventsDir).filter(f => f.endsWith(".js"))) {
-  try {
-    const event = require(path.join(eventsDir, file));
-    if (event.once) {
-      client.once(event.name, (...args) => event.execute(...args));
-    } else {
-      client.on(event.name, (...args) => event.execute(...args));
+if (fs.existsSync(eventsDir)) {
+  for (const file of fs.readdirSync(eventsDir).filter(f => f.endsWith(".js"))) {
+    try {
+      const event = require(path.join(eventsDir, file));
+      if (event.once) {
+        client.once(event.name, (...args) => event.execute(...args));
+      } else {
+        client.on(event.name, (...args) => event.execute(...args));
+      }
+    } catch (e) {
+      console.error(`[event] Failed to load ${file}:`, e.message);
     }
-  } catch (e) {
-    console.error(`[event] Failed to load ${file}:`, e.message);
   }
+} else {
+  console.warn("[event] Events directory not found, skipping event loading.");
 }
 
 // Restore active tempbans on startup
