@@ -1,185 +1,231 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+  MessageFlags,
+} = require("discord.js");
 const { LOGO } = require("../../utils/embed");
-const config = require("../../../config.json");
+const config   = require("../../../config.json");
 
-const ARROW = "›";
-const DOT   = "•";
-const COLOR = config.colors.default;
+const COLOR = config.colors?.default ?? 0x2b2d31;
 
-const categories = {
-  moderation:   { emoji: "🛡️", label: "Moderation",   commands: ["ban","unban","kick","softban","hardban","hackban","tempban","mute","unmute","warn","warnings","delwarn","clearwarns","jail","unjail","purge","lock","unlock","slowmode","nick","role","strip","stripstaff","deafen","undeafen","move","setup","antinuke"] },
-  utility:      { emoji: "🔧", label: "Utility",       commands: ["avatar","banner","serverinfo","userinfo","roleinfo","ping","uptime","botinfo","snipe","editsnipe","steal","stealemoji","emojiinfo","inviteinfo","membercount","icon","color","reminder","poll","todo","prefix"] },
-  fun:          { emoji: "🎉", label: "Fun",            commands: ["8ball","coinflip","roll","rps","joke","meme","ship","rate","pp","gay","roast","compliment","fact","hug","kiss","slap","pat"] },
-  economy:      { emoji: "💰", label: "Economy",        commands: ["balance","daily","weekly","work","beg","crime","rob","deposit","withdraw","pay","slots","shop","buy","inventory","leaderboard"] },
-  leveling:     { emoji: "📊", label: "Leveling",       commands: ["rank","levels","xpleaderboard"] },
-  giveaway:     { emoji: "🎊", label: "Giveaway",       commands: ["giveaway"] },
-  music:        { emoji: "🎵", label: "Music",          commands: ["play","queue","nowplaying","skip","pause","resume","stop","volume","shuffle","loop","remove","clearqueue","lyrics"] },
-  lastfm:       { emoji: "🎸", label: "Last.fm",        commands: ["lastfm","fmset","np","recenttracks","topartists","toptracks","topalbums","whoknows","taste"] },
-  config:       { emoji: "⚙️", label: "Config",         commands: ["welcome","goodbye","boost","log","alias","autoresponder","timer","reactiontrigger","bumpreminder","reactionrole","buttonrole","boosterrole","starboard","clownboard","counter","voicemaster","tickets","autorole","bind","settings"] },
-  integrations: { emoji: "🎮", label: "Integrations",   commands: ["fortnite","webhook"] },
+// ─────────────────────────────────────────────
+// Category definitions
+// ─────────────────────────────────────────────
+const ALL = {
+  // ── Main menu ──
+  moderation: {
+    emoji: "🛡️", label: "Moderation",
+    commands: ["ban","unban","kick","softban","hardban","hackban","tempban","mute","unmute","warn","warnings","delwarn","clearwarns","jail","unjail","purge","lock","unlock","slowmode","nick","role","strip","stripstaff","deafen","undeafen","move","setup","antinuke"],
+  },
+  utility: {
+    emoji: "🔧", label: "Utility",
+    commands: ["avatar","banner","serverinfo","userinfo","roleinfo","ping","uptime","botinfo","snipe","editsnipe","steal","stealemoji","emojiinfo","inviteinfo","membercount","icon","color","reminder","poll","todo","prefix","afk","urban","calc","list","translate","hack","crypto","weather"],
+  },
+  fun: {
+    emoji: "🎉", label: "Fun",
+    commands: ["8ball","coinflip","roll","rps","joke","meme","ship","rate","pp","gay","roast","compliment","fact","hug","kiss","slap","pat","truth","dare"],
+  },
+  economy: {
+    emoji: "💰", label: "Economy",
+    commands: ["balance","daily","weekly","work","beg","crime","rob","deposit","withdraw","pay","slots","shop","buy","inventory","leaderboard"],
+  },
+  leveling: {
+    emoji: "📊", label: "Leveling",
+    commands: ["rank","levels","xpleaderboard"],
+  },
+  music: {
+    emoji: "🎵", label: "Music",
+    commands: ["play","queue","nowplaying","skip","pause","resume","stop","volume","shuffle","loop","remove","clearqueue","lyrics"],
+  },
+  lastfm: {
+    emoji: "🎸", label: "Last.fm",
+    commands: ["lastfm","fmset","np","recenttracks","topartists","toptracks","topalbums","whoknows","taste"],
+  },
+  integrations: {
+    emoji: "🎮", label: "Integrations",
+    commands: ["fortnite","webhook"],
+  },
+  // ── Extra menu ──
+  config: {
+    emoji: "⚙️", label: "Config",
+    commands: ["welcome","goodbye","boost","log","alias","autoresponder","timer","reactiontrigger","bumpreminder","reactionrole","buttonrole","boosterrole","starboard","clownboard","counter","voicemaster","tickets","autorole","bind","settings"],
+  },
+  giveaway: {
+    emoji: "🎊", label: "Giveaway",
+    commands: ["giveaway"],
+  },
+  tracking: {
+    emoji: "📈", label: "Tracking",
+    commands: ["tracking"],
+  },
+  sticky: {
+    emoji: "📌", label: "Sticky",
+    commands: ["sticky"],
+  },
+  counting: {
+    emoji: "🔢", label: "Counting",
+    commands: ["counting"],
+  },
+  ignore: {
+    emoji: "🚫", label: "Ignore",
+    commands: ["ignore"],
+  },
 };
 
-const total = Object.values(categories).reduce((n, c) => n + c.commands.length, 0);
+const MAIN_KEYS  = ["moderation","utility","fun","economy","leveling","music","lastfm","integrations"];
+const EXTRA_KEYS = ["config","giveaway","tracking","sticky","counting","ignore"];
 
-// Exported so interactionCreate can reuse them
-function buildFooter(interaction) {
-  return { text: `${interaction?.user?.username ?? "luna"} ${DOT} luna`, iconURL: LOGO };
+const TOTAL = Object.values(ALL).reduce((n, c) => n + c.commands.length, 0);
+
+// ─────────────────────────────────────────────
+// Builders
+// ─────────────────────────────────────────────
+function homeOption() {
+  return new StringSelectMenuOptionBuilder().setLabel("Home").setValue("home").setEmoji("🏠");
 }
 
-function buildCategoryButtons(userId) {
-  const entries = Object.entries(categories);
-  const rows = [];
-  // 5 buttons per row, max 2 rows (10 buttons = all 10 categories)
-  for (let i = 0; i < entries.length; i += 5) {
-    const row = new ActionRowBuilder();
-    for (const [key, cat] of entries.slice(i, i + 5)) {
-      row.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`help_cat_${userId}_${key}`)
-          .setLabel(cat.label)
-          .setEmoji(cat.emoji)
-          .setStyle(ButtonStyle.Secondary)
-      );
-    }
-    rows.push(row);
-  }
-  return rows;
-}
-
-function buildBackButton(userId) {
+function mainSelectRow(userId) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
+    new StringSelectMenuBuilder()
       .setCustomId(`help_main_${userId}`)
-      .setLabel("Back")
-      .setEmoji("◀️")
-      .setStyle(ButtonStyle.Secondary)
+      .setPlaceholder("📚 Main Categories")
+      .addOptions(
+        homeOption(),
+        ...MAIN_KEYS.map(k =>
+          new StringSelectMenuOptionBuilder()
+            .setLabel(ALL[k].label)
+            .setValue(k)
+            .setEmoji(ALL[k].emoji)
+            .setDescription(`${ALL[k].commands.length} commands`)
+        )
+      )
   );
 }
 
-function buildMainEmbed(client) {
-  const catLines = Object.values(categories)
-    .map(c => `${ARROW} ${c.emoji} **${c.label}** \`${c.commands.length}\``)
+function extraSelectRow(userId) {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`help_extra_${userId}`)
+      .setPlaceholder("📂 Extra Categories")
+      .addOptions(
+        homeOption(),
+        ...EXTRA_KEYS.map(k =>
+          new StringSelectMenuOptionBuilder()
+            .setLabel(ALL[k].label)
+            .setValue(k)
+            .setEmoji(ALL[k].emoji)
+            .setDescription(`${ALL[k].commands.length} commands`)
+        )
+      )
+  );
+}
+
+function buildHomeContainer(client, userId) {
+  const catLines = [...MAIN_KEYS, ...EXTRA_KEYS]
+    .map(k => `${ALL[k].emoji}  **${ALL[k].label}**  —  \`${ALL[k].commands.length} commands\``)
     .join("\n");
 
-  return new EmbedBuilder()
-    .setColor(COLOR)
-    .setAuthor({ name: client.user.username, iconURL: LOGO })
-    .setThumbnail(LOGO)
-    .setDescription(
-      `-# ${total} commands across ${Object.keys(categories).length} categories\n` +
-      `\u200b\n` +
-      catLines +
-      `\n\u200b\n` +
-      `-# click a category below or use \`-help [command]\``
+  return new ContainerBuilder()
+    .setAccentColor(COLOR)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`# ${client.user.username}`)
     )
-    .setTimestamp();
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `-# ${TOTAL} commands across ${Object.keys(ALL).length} categories\n\u200b\n` +
+        catLines +
+        `\n\u200b\n-# Select a category from the menus below`
+      )
+    )
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addActionRowComponents(mainSelectRow(userId))
+    .addActionRowComponents(extraSelectRow(userId));
 }
 
-function buildCategoryEmbed(catKey, interaction) {
-  const cat = categories[catKey];
+function buildCategoryContainer(catKey, userId) {
+  const cat = ALL[catKey];
   if (!cat) return null;
 
-  const cmds = cat.commands;
-  const rows = [];
-  let row = [];
-  let rowLen = 0;
-  for (const c of cmds) {
-    const token = `\`${c}\``;
-    if (rowLen + token.length + 2 > 60 && row.length) {
-      rows.push(row.join("  "));
-      row = [];
-      rowLen = 0;
-    }
-    row.push(token);
-    rowLen += token.length + 2;
-  }
-  if (row.length) rows.push(row.join("  "));
+  const cmds = cat.commands.map(c => `\`${c}\``).join("  ");
 
-  return new EmbedBuilder()
-    .setColor(COLOR)
-    .setAuthor({ name: `${cat.emoji}  ${cat.label}`, iconURL: LOGO })
-    .setThumbnail(LOGO)
-    .setDescription(
-      `-# ${cat.commands.length} commands\n\n` +
-      rows.join("\n")
+  return new ContainerBuilder()
+    .setAccentColor(COLOR)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`# ${cat.emoji}  ${cat.label} Commands`)
     )
-    .setFooter(buildFooter(interaction))
-    .setTimestamp();
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`-# ${cat.commands.length} commands\n\n${cmds}`)
+    )
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addActionRowComponents(mainSelectRow(userId))
+    .addActionRowComponents(extraSelectRow(userId));
 }
 
+// ─────────────────────────────────────────────
+// Exports (used by interactionCreate)
+// ─────────────────────────────────────────────
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("help")
-    .setDescription("View all commands")
-    .addStringOption(o => o.setName("input").setDescription("A category name or command name")),
+    .setDescription("Browse all bot commands")
+    .addStringOption(o => o.setName("input").setDescription("Command or category name")),
 
-  // Export helpers for interactionCreate
-  buildMainEmbed,
-  buildCategoryEmbed,
-  buildCategoryButtons,
-  buildBackButton,
-  categories,
+  buildHomeContainer,
+  buildCategoryContainer,
+  ALL,
+  MAIN_KEYS,
+  EXTRA_KEYS,
 
   async execute(interaction) {
-    const input  = interaction.options.getString("input")?.toLowerCase().trim();
+    const input  = interaction.options?.getString?.("input")?.toLowerCase().trim();
     const client = interaction.client;
     const userId = interaction.user.id;
 
-    // ── Command info card ────────────────────────────────────────────────
-    const matchedCmd = input ? client.commands.get(input) : null;
-    if (matchedCmd) {
-      const d    = typeof matchedCmd.data.toJSON === "function" ? matchedCmd.data.toJSON() : matchedCmd.data;
-      const subs = (d.options ?? []).filter(o => o.type === 1);
-      const opts = (d.options ?? []).filter(o => o.type !== 1 && o.type !== 2);
-
-      const embed = new EmbedBuilder()
-        .setColor(COLOR)
-        .setAuthor({ name: d.name, iconURL: LOGO })
-        .setDescription(d.description)
-        .setFooter(buildFooter(interaction))
-        .setTimestamp();
-
-      if (subs.length) {
-        embed.addFields({
-          name: "Subcommands",
-          value: subs.map(s => `\`${s.name}\` — ${s.description}`).join("\n"),
-        });
-      }
-      if (opts.length) {
-        embed.addFields({
-          name: "Options",
-          value: opts.map(o =>
-            `\`${o.name}\` ${o.required ? "**(required)**" : "(optional)"} — ${o.description}`
-          ).join("\n"),
-        });
-      }
-      embed.addFields({
-        name: "Usage",
-        value: `\`-${d.name}${opts.length ? " " + opts.map(o => o.required ? `[${o.name}]` : `<${o.name}>`).join(" ") : ""}\``,
-      });
-
-      return interaction.reply({ embeds: [embed] });
-    }
-
-    // ── Category typed directly ──────────────────────────────────────────
+    // ── Single command info ─────────────────────────────────────────────
     if (input) {
-      const match = Object.entries(categories).find(
-        ([key, c]) => key === input || c.label.toLowerCase() === input
-      );
-      if (match) {
-        const [key] = match;
+      const matchedCmd = client.commands.get(input);
+      if (matchedCmd) {
+        const d    = typeof matchedCmd.data.toJSON === "function" ? matchedCmd.data.toJSON() : matchedCmd.data;
+        const subs = (d.options ?? []).filter(o => o.type === 1);
+        const opts = (d.options ?? []).filter(o => o.type !== 1 && o.type !== 2);
+
+        const { base } = require("../../utils/embed");
+        const embed = base(interaction)
+          .setAuthor({ name: d.name, iconURL: LOGO })
+          .setDescription(d.description)
+          .setTimestamp();
+
+        if (subs.length) embed.addFields({ name: "Subcommands", value: subs.map(s => `\`${s.name}\` — ${s.description}`).join("\n") });
+        if (opts.length) embed.addFields({ name: "Options",     value: opts.map(o => `\`${o.name}\` ${o.required ? "**(required)**" : "(optional)"} — ${o.description}`).join("\n") });
+        embed.addFields({ name: "Usage", value: `\`-${d.name}${opts.length ? " " + opts.map(o => o.required ? `[${o.name}]` : `<${o.name}>`).join(" ") : ""}\`` });
+
+        return interaction.reply({ embeds: [embed] });
+      }
+
+      // category by name
+      const catKey = Object.entries(ALL).find(([k, c]) =>
+        k === input || c.label.toLowerCase() === input
+      )?.[0];
+
+      if (catKey) {
         return interaction.reply({
-          embeds: [buildCategoryEmbed(key, interaction)],
-          components: [buildBackButton(userId)],
+          flags:      MessageFlags.IsComponentsV2,
+          components: [buildCategoryContainer(catKey, userId)],
         });
       }
     }
 
-    // ── Main help page with buttons ──────────────────────────────────────
-    const embed = buildMainEmbed(client).setFooter(buildFooter(interaction));
-    await interaction.reply({
-      embeds: [embed],
-      components: buildCategoryButtons(userId),
+    // ── Home page ───────────────────────────────────────────────────────
+    return interaction.reply({
+      flags:      MessageFlags.IsComponentsV2,
+      components: [buildHomeContainer(client, userId)],
     });
   },
 };
