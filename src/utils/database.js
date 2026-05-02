@@ -1,4 +1,4 @@
-const fs = require("fs");
+const fs   = require("fs");
 const path = require("path");
 const config = require("../../config.json");
 
@@ -7,18 +7,15 @@ const dataDir = path.resolve(__dirname, "../../", config.dataPath);
 function ensureDir() {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 }
-
 function loadFile(name) {
   ensureDir();
   const file = path.join(dataDir, `${name}.json`);
   if (!fs.existsSync(file)) fs.writeFileSync(file, "{}");
   return JSON.parse(fs.readFileSync(file, "utf-8"));
 }
-
 function saveFile(name, data) {
   ensureDir();
-  const file = path.join(dataDir, `${name}.json`);
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+  fs.writeFileSync(path.join(dataDir, `${name}.json`), JSON.stringify(data, null, 2));
 }
 
 // --- Economy ---
@@ -166,6 +163,40 @@ function saveSocialFeeds(guildId, data) { const db = loadFile("socialfeeds"); db
 function getTempChannels() { return loadFile("tempchannels"); }
 function saveTempChannels(data) { saveFile("tempchannels", data); }
 
+// --- AFK ---
+function getAfk(userId) { const db = loadFile("afk"); return db[userId] ?? null; }
+function setAfk(userId, data) { const db = loadFile("afk"); db[userId] = data; saveFile("afk", db); }
+function removeAfk(userId) { const db = loadFile("afk"); delete db[userId]; saveFile("afk", db); }
+function getAllAfk() { return loadFile("afk"); }
+
+// --- Tracking ---
+function getTracking(guildId) {
+  const db = loadFile("tracking");
+  if (!db[guildId]) db[guildId] = { enabled: false, users: {} };
+  return db[guildId];
+}
+function saveTracking(guildId, data) { const db = loadFile("tracking"); db[guildId] = data; saveFile("tracking", db); }
+
+// --- Ignore ---
+function getIgnore(guildId) {
+  const db = loadFile("ignore");
+  if (!db[guildId]) db[guildId] = { channels: [], users: [], commands: [], bypass: [] };
+  return db[guildId];
+}
+function saveIgnore(guildId, data) { const db = loadFile("ignore"); db[guildId] = data; saveFile("ignore", db); }
+
+// --- Sticky Messages ---
+function getSticky(guildId) { const db = loadFile("sticky"); return db[guildId] ?? {}; }
+function saveSticky(guildId, data) { const db = loadFile("sticky"); db[guildId] = data; saveFile("sticky", db); }
+
+// --- Counting ---
+function getCounting(guildId) {
+  const db = loadFile("counting");
+  if (!db[guildId]) db[guildId] = { channelId: null, count: 0, lastUserId: null, failed: false };
+  return db[guildId];
+}
+function saveCounting(guildId, data) { const db = loadFile("counting"); db[guildId] = data; saveFile("counting", db); }
+
 module.exports = {
   loadFile, saveFile,
   getEconomy, saveEconomy,
@@ -189,4 +220,9 @@ module.exports = {
   getStarboard, saveStarboard,
   getSocialFeeds, saveSocialFeeds,
   getTempChannels, saveTempChannels,
+  getAfk, setAfk, removeAfk, getAllAfk,
+  getTracking, saveTracking,
+  getIgnore, saveIgnore,
+  getSticky, saveSticky,
+  getCounting, saveCounting,
 };
