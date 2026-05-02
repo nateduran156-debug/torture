@@ -62,7 +62,7 @@ function clearWarnings(guildId, userId) {
 function getGuildConfig(guildId) {
   const db = loadFile("guilds");
   if (!db[guildId]) db[guildId] = {
-    prefix: ",", welcomeChannel: null, goodbyeChannel: null, boostChannel: null,
+    prefix: "-", welcomeChannel: null, goodbyeChannel: null, boostChannel: null,
     welcomeMessage: null, goodbyeMessage: null, boostMessage: null,
     logChannels: {}, autorole: null, levelEnabled: false, levelChannel: null,
     levelIgnore: [], levelRewards: [], staffRoles: [], djRole: null,
