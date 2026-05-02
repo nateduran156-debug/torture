@@ -1,0 +1,36 @@
+{
+  "colors": {
+    "default": 2829617,
+    "success": 3066993,
+    "error": 15158332,
+    "warning": 16776960,
+    "info": 2829617
+  },
+  "emojis": {
+    "success": "✅",
+    "error": "❌",
+    "warning": "⚠️",
+    "loading": "⏳",
+    "arrow": "›",
+    "dot": "•"
+  },
+  "economy": {
+    "daily": 250,
+    "weekly": 1500,
+    "workMin": 50,
+    "workMax": 300,
+    "begMin": 5,
+    "begMax": 75,
+    "crimeMin": 100,
+    "crimeMax": 500,
+    "crimeFine": 200,
+    "robSuccessChance": 40,
+    "robMax": 500,
+    "slotsWinChance": 35
+  },
+  "xp": {
+    "perMessage": 15,
+    "cooldown": 60000
+  },
+  "dataPath": "./data"
+}
