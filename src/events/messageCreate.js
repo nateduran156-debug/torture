@@ -1,7 +1,8 @@
 const { getGuildConfig, getLevel, saveLevel, getAutoresponders, getReactionTriggers } = require("../utils/database");
-const { base } = require("../utils/embed");
+const { base, error } = require("../utils/embed");
 const config = require("../../config.json");
 const { xpForLevel } = require("../utils/permissions");
+const { PrefixInteraction } = require("../utils/prefixInteraction");
 
 const DISBOARD_ID = "302050872383242240";
 
@@ -10,7 +11,6 @@ module.exports = {
   async execute(message) {
     if (!message.guild) return;
 
-    // Store snipe data
     message.client.snipes = message.client.snipes ?? new Map();
 
     // --- Bump Reminder detection ---
@@ -36,6 +36,28 @@ module.exports = {
     if (message.author.bot) return;
 
     const cfg = getGuildConfig(message.guild.id);
+    const prefix = cfg.prefix ?? "-";
+
+    // --- Prefix Command Handler ---
+    if (message.content.startsWith(prefix)) {
+      const args = message.content.slice(prefix.length).trim().split(/\s+/);
+      const commandName = args.shift().toLowerCase();
+      if (!commandName) return;
+
+      const command = message.client.commands.get(commandName)
+        ?? message.client.commands.find(c => c.data?.name === commandName);
+
+      if (command) {
+        try {
+          const interaction = new PrefixInteraction(message, command, args);
+          await command.execute(interaction);
+        } catch (e) {
+          console.error(`[prefix] Error in ${commandName}:`, e.message);
+          message.channel.send({ embeds: [error(null, `Something went wrong running \`${prefix}${commandName}\`.`)] }).catch(() => {});
+        }
+        return;
+      }
+    }
 
     // --- Auto Responders ---
     const autoresponders = getAutoresponders(message.guild.id);
@@ -63,6 +85,9 @@ module.exports = {
 
     // --- XP / Leveling ---
     if (!cfg.levelEnabled) return;
+
+    const levelIgnore = cfg.levelIgnore ?? [];
+    if (levelIgnore.includes(message.channel.id) || levelIgnore.some(id => message.member.roles.cache.has(id))) return;
 
     const data = getLevel(message.guild.id, message.author.id);
     const now = Date.now();

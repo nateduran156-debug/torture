@@ -6,7 +6,7 @@ module.exports = {
   name: "interactionCreate",
   async execute(interaction) {
 
-    // --- Slash commands ---
+    // ── Slash commands ───────────────────────────────────────────────────
     if (interaction.isChatInputCommand()) {
       const command = interaction.client.commands.get(interaction.commandName);
       if (!command) return;
@@ -21,11 +21,47 @@ module.exports = {
       return;
     }
 
-    // --- Button interactions ---
+    // ── Button interactions ──────────────────────────────────────────────
     if (interaction.isButton()) {
       const { customId } = interaction;
 
-      // Giveaway entry
+      // ── Help category buttons ──────────────────────────────────────────
+      if (customId.startsWith("help_cat_") || customId.startsWith("help_main_")) {
+        const parts  = customId.split("_");
+        const userId = parts[2];
+
+        // Only the original user can use these buttons
+        if (interaction.user.id !== userId) {
+          return interaction.reply({ content: "These buttons aren't for you.", ephemeral: true });
+        }
+
+        const helpCmd = interaction.client.commands.get("help");
+        if (!helpCmd) return;
+
+        // Back to main page
+        if (customId.startsWith("help_main_")) {
+          const embed = helpCmd.buildMainEmbed(interaction.client)
+            .setFooter({ text: `${interaction.user.username} • luna`, iconURL: require("../utils/embed").LOGO })
+            .setTimestamp();
+
+          return interaction.update({
+            embeds: [embed],
+            components: helpCmd.buildCategoryButtons(userId),
+          });
+        }
+
+        // Category view — key is everything after help_cat_{userId}_
+        const catKey = parts.slice(3).join("_");
+        const embed  = helpCmd.buildCategoryEmbed(catKey, interaction);
+        if (!embed) return interaction.reply({ content: "Category not found.", ephemeral: true });
+
+        return interaction.update({
+          embeds: [embed],
+          components: [helpCmd.buildBackButton(userId)],
+        });
+      }
+
+      // ── Giveaway entry ─────────────────────────────────────────────────
       if (customId === "giveaway_enter") {
         const giveaways = getGiveaways();
         const gw = giveaways[interaction.message.id];
@@ -41,10 +77,10 @@ module.exports = {
         return interaction.reply({ content: `🎉 You entered the giveaway! (**${gw.entries.length}** entries total)`, ephemeral: true });
       }
 
-      // Button roles
+      // ── Button roles ───────────────────────────────────────────────────
       if (customId.startsWith("buttonrole_")) {
         const [, msgId, idxStr] = customId.split("_");
-        const br = getButtonRoles(interaction.guild?.id);
+        const br      = getButtonRoles(interaction.guild?.id);
         const buttons = br[msgId];
         if (!buttons) return interaction.reply({ content: "Button role data not found.", ephemeral: true });
 
@@ -55,23 +91,23 @@ module.exports = {
         if (member.roles.cache.has(btn.roleId)) {
           await member.roles.remove(btn.roleId).catch(() => {});
           return interaction.reply({ content: `Removed role <@&${btn.roleId}>.`, ephemeral: true });
-        } else {
-          await member.roles.add(btn.roleId).catch(() => {});
-          return interaction.reply({ content: `Added role <@&${btn.roleId}>.`, ephemeral: true });
         }
+        await member.roles.add(btn.roleId).catch(() => {});
+        return interaction.reply({ content: `Added role <@&${btn.roleId}>.`, ephemeral: true });
       }
 
-      // Ticket open
+      // ── Ticket open ────────────────────────────────────────────────────
       if (customId.startsWith("ticket_open_")) {
-        const panelId = customId.replace("ticket_open_", "");
+        const panelId    = customId.replace("ticket_open_", "");
         const ticketData = getTickets(interaction.guild.id);
-        const panel = ticketData.panels?.find(p => p.panelId === panelId);
+        const panel      = ticketData.panels?.find(p => p.panelId === panelId);
         if (!panel) return interaction.reply({ content: "Ticket panel not found.", ephemeral: true });
 
         ticketData.openTickets = ticketData.openTickets ?? {};
 
-        // Check if user already has an open ticket
-        const existing = Object.values(ticketData.openTickets).find(t => t.openedBy === interaction.user.id && t.panelId === panelId);
+        const existing = Object.values(ticketData.openTickets).find(
+          t => t.openedBy === interaction.user.id && t.panelId === panelId
+        );
         if (existing) {
           const ch = interaction.guild.channels.cache.get(existing.channelId);
           if (ch) return interaction.reply({ content: `You already have an open ticket: ${ch}`, ephemeral: true });
@@ -79,7 +115,7 @@ module.exports = {
 
         try {
           const overwrites = [
-            { id: interaction.guild.roles.everyone, deny: [PermissionFlagsBits.ViewChannel] },
+            { id: interaction.guild.roles.everyone,  deny: [PermissionFlagsBits.ViewChannel] },
             { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
             { id: interaction.guild.members.me, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] },
           ];
@@ -108,16 +144,15 @@ module.exports = {
           );
 
           await ticketCh.send({ embeds: [embed], components: [row] });
-          await interaction.reply({ content: `Your ticket has been created: ${ticketCh}`, ephemeral: true });
-        } catch (e) {
-          await interaction.reply({ content: "Failed to create ticket channel.", ephemeral: true });
+          return interaction.reply({ content: `Your ticket has been created: ${ticketCh}`, ephemeral: true });
+        } catch {
+          return interaction.reply({ content: "Failed to create ticket channel.", ephemeral: true });
         }
-        return;
       }
 
-      // Ticket close via button
+      // ── Ticket close via button ────────────────────────────────────────
       if (customId === "ticket_close_btn") {
-        const ticketData = getTickets(interaction.guild.id);
+        const ticketData  = getTickets(interaction.guild.id);
         const ticketEntry = Object.entries(ticketData.openTickets ?? {}).find(([, t]) => t.channelId === interaction.channel.id);
         if (!ticketEntry) return interaction.reply({ content: "This is not a ticket channel.", ephemeral: true });
         await interaction.reply({ content: "Closing ticket in 5 seconds..." });
