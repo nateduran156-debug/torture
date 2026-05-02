@@ -1,4 +1,4 @@
-const { PermissionFlagsBits, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { PermissionFlagsBits, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require("discord.js");
 const { error, success, base } = require("../utils/embed");
 const { getGiveaways, saveGiveaways, getButtonRoles, getTickets, saveTickets } = require("../utils/database");
 
@@ -21,45 +21,43 @@ module.exports = {
       return;
     }
 
-    // ── Button interactions ──────────────────────────────────────────────
-    if (interaction.isButton()) {
+    // ── Select menus (Help navigation) ──────────────────────────────────
+    if (interaction.isStringSelectMenu()) {
       const { customId } = interaction;
 
-      // ── Help category buttons ──────────────────────────────────────────
-      if (customId.startsWith("help_cat_") || customId.startsWith("help_main_")) {
+      if (customId.startsWith("help_main_") || customId.startsWith("help_extra_")) {
         const parts  = customId.split("_");
         const userId = parts[2];
 
-        // Only the original user can use these buttons
         if (interaction.user.id !== userId) {
-          return interaction.reply({ content: "These buttons aren't for you.", ephemeral: true });
+          return interaction.reply({ content: "This menu isn't for you.", ephemeral: true });
         }
 
         const helpCmd = interaction.client.commands.get("help");
         if (!helpCmd) return;
 
-        // Back to main page
-        if (customId.startsWith("help_main_")) {
-          const embed = helpCmd.buildMainEmbed(interaction.client)
-            .setFooter({ text: `${interaction.user.username} • luna`, iconURL: require("../utils/embed").LOGO })
-            .setTimestamp();
+        const chosen = interaction.values[0];
 
+        if (chosen === "home") {
           return interaction.update({
-            embeds: [embed],
-            components: helpCmd.buildCategoryButtons(userId),
+            flags:      MessageFlags.IsComponentsV2,
+            components: [helpCmd.buildHomeContainer(interaction.client, userId)],
           });
         }
 
-        // Category view — key is everything after help_cat_{userId}_
-        const catKey = parts.slice(3).join("_");
-        const embed  = helpCmd.buildCategoryEmbed(catKey, interaction);
-        if (!embed) return interaction.reply({ content: "Category not found.", ephemeral: true });
+        const container = helpCmd.buildCategoryContainer(chosen, userId);
+        if (!container) return interaction.reply({ content: "Category not found.", ephemeral: true });
 
         return interaction.update({
-          embeds: [embed],
-          components: [helpCmd.buildBackButton(userId)],
+          flags:      MessageFlags.IsComponentsV2,
+          components: [container],
         });
       }
+    }
+
+    // ── Button interactions ──────────────────────────────────────────────
+    if (interaction.isButton()) {
+      const { customId } = interaction;
 
       // ── Giveaway entry ─────────────────────────────────────────────────
       if (customId === "giveaway_enter") {
