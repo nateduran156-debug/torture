@@ -42,7 +42,7 @@ function loadCommands(dir) {
   }
 }
 
-const commandsDir = path.join(__dirname, "commands");
+const commandsDir = path.join(__dirname, "cmds");
 if (fs.existsSync(commandsDir)) {
   loadCommands(commandsDir);
 } else {
