@@ -42,7 +42,7 @@ function loadCommands(dir) {
   }
 }
 
-loadCommands(path.join(__dirname, "cmds"));
+loadCommands(path.join(__dirname, "commands"));
 
 const eventsDir = path.join(__dirname, "events");
 for (const file of fs.readdirSync(eventsDir).filter(f => f.endsWith(".js"))) {
